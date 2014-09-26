@@ -6,6 +6,7 @@ import (
     "crypto/sha1"
     "encoding/base64"
     "fmt"
+    "io"
     "log"
     "os"
     "strconv"
@@ -17,6 +18,29 @@ const (
     peerId = "-WZ0001-373bff40fe0e"
     port   = "6881"
 )
+
+type client struct {
+    torrent io.Reader
+}
+
+/*
+func (c *client) area() int {
+    return r.width * r.height
+}
+*/
+
+func New(torrent io.Reader) *client {
+    c := new(client)
+    c.torrent = torrent
+    /*
+    s.CurrentVersion = defaultVersion
+    s.Root = newDir(s, "/", s.CurrentIndex, nil, "", Permanent)
+    s.Stats = newStats()
+    s.WatcherHub = newWatchHub(1000)
+    s.ttlKeyHeap = newTtlKeyHeap()
+    */
+    return c
+}
 
 // tracker request params described here:
 // https://wiki.theory.org/BitTorrentSpecification#Tracker_Request_Parameters
