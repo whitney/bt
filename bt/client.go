@@ -1,13 +1,12 @@
 package bt
 
 import (
-    //"bytes"
-    //"encoding/binary"
     "crypto/sha1"
+    "encoding/gob"
     "fmt"
     "io"
-    //"io/ioutil"
     "log"
+    "net"
     "net/http"
     "net/url"
     "strconv"
@@ -56,8 +55,6 @@ func torrentSize(infoHash map[string]interface{}) int64 {
         return length.(int64)
     }
 
-    //files := infoHash["files"].()
-
     var numBytes int64 = 0
 
     // multi file mode
@@ -95,20 +92,58 @@ func (c *client) trackerURL() string {
     return c.announce + "?" + params.Encode()
 }
 
-func (c *client) TrackerRequest() string {
+func (c *client) Start() {
+
+    c.startServer()
+
+    fmt.Println(c.trackerRequest()) 
+}
+
+func (c *client) startServer() {
+    ln, err := net.Listen("tcp", ":8080")
+    if err != nil {
+        // handle error
+    }
+
+    defer ln.Close()
+
+    for {
+        conn, err := ln.Accept()
+        if err != nil {
+            // handle error
+            continue
+        }
+        go handleConn(conn)
+    }
+}
+
+type P struct {
+    M, N int64
+}
+func handleConn(conn net.Conn) {
+    dec := gob.NewDecoder(conn)
+    p := &P{}
+    dec.Decode(p)
+    fmt.Printf("Received : %+v", p);
+    conn.Write([]byte("Message received."))
+}
+
+type trackerResponse struct {
+    FailureReason string
+    Interval int64
+    MinInterval int64
+    Complete int64
+    Incomplete int64
+    Peers []string
+}
+
+func (c *client) trackerRequest() *trackerResponse {
     resp, err := http.Get(c.trackerURL())
     if err != nil {
         log.Fatal(err)
     }
 
     defer resp.Body.Close()
-
-    /*
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        log.Fatal(err)
-    }
-    */
 
     fmt.Printf("tracker request status code: %s\n", resp.Status)
 
@@ -117,70 +152,79 @@ func (c *client) TrackerRequest() string {
         log.Fatal(err)
     }
 
-    fmt.Println("TrackerRequest dict:", dict)
+    tr := new(trackerResponse)
 
     failureReason := dict["failure reason"]
     if failureReason != nil {
-        failureReason = failureReason.(string)
+        tr.FailureReason = failureReason.(string)
     }
-    fmt.Printf("failureReason: %s\n", failureReason)
 
     interval := dict["interval"]
     if interval != nil {
-        interval = interval.(int64)
+        tr.Interval = interval.(int64)
     }
-    fmt.Printf("interval: %s\n", interval)
 
     minInterval := dict["min interval"]
     if minInterval != nil {
-        minInterval = minInterval.(int64)
+        tr.MinInterval = minInterval.(int64)
     }
-    fmt.Printf("minInterval: %s\n", minInterval)
 
     complete := dict["complete"]
     if complete != nil {
-        complete = complete.(int64)
+        tr.Complete = complete.(int64)
     }
-    fmt.Printf("complete: %s\n", complete)
 
     incomplete := dict["incomplete"]
     if incomplete != nil {
-        incomplete = incomplete.(int64)
+        tr.Incomplete = incomplete.(int64)
     }
-    fmt.Printf("incomplete: %s\n", incomplete)
 
     var binPeers string
     var isBinaryPeers bool
+    var peers []string
 
     // determine if peers field is disctionary model or binary model
     dictPeers, isDictPeers := dict["peers"].(map[string]interface{})
-    if !isDictPeers {
+    if isDictPeers {
+        // TODO handle dictionary peers
+        fmt.Println("dictPeers:", dictPeers)
+    } else {
         binPeers, isBinaryPeers = dict["peers"].(string)
         if !isBinaryPeers {
             log.Fatal("invalid peers field")
         }
-        for i := 0; i < len(binPeers); i++ {
-            fmt.Printf("%x ", binPeers[i])
-        }
-        l := binPeers[0:4]
-        fmt.Printf("sl1: %x\n", l)
 
-        fmt.Print([]byte(binPeers[0:4]))
-        fmt.Print([]byte(binPeers[4:6]))
-        /*
-        var ip int
-        buf := bytes.NewReader([]byte(binPeers[0:4]))
-        err := binary.Read(buf, binary.BigEndian, &ip)
-        if err != nil {
-            fmt.Println("binary.Read failed:", err)
+        low := 0
+        high := 6
+        
+        for high <= len(binPeers) {
+            peers = append(peers, ParsePeer([]byte(binPeers[low:high])))
+            low += 6
+            high += 6
         }
-        fmt.Print(ip)
-        */
     } 
 
-    fmt.Println("dictPeers:", dictPeers)
-    fmt.Println("binPeers:", binPeers)
+    tr.Peers = peers
 
-    //return string(body)
-    return "pants"
+    return tr
+}
+
+// returns <ip address>:<port>
+func ParsePeer(peer []byte) string {
+    peerIp := ""
+    ipBytes := peer[0:4]
+
+    for i := 0; i < len(ipBytes); i++ {
+        ipComponent := int64(ipBytes[i])
+        peerIp += strconv.FormatInt(ipComponent, 10)
+
+        if i < len(ipBytes) - 1 {
+            peerIp += "."
+        }
+    }
+
+    portBytes := peer[4:6]
+    port := strconv.FormatInt(256 * int64(portBytes[0]) + int64(portBytes[1]), 10)
+
+    return peerIp + ":" + port
 }

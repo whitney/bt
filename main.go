@@ -1,7 +1,6 @@
 package main
 
 import (
-    "fmt"
     "log"
     "os"
 
@@ -17,5 +16,5 @@ func main() {
 
     c := bt.New(file)
 
-    fmt.Printf("tracker response: %s\n", c.TrackerRequest())
+    c.Start()
 }
