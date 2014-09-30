@@ -4,4 +4,4 @@ BitTorrent spec:
 https://wiki.theory.org/BitTorrentSpecification
 
 Usage:
-
+go run main.go .torrent/Nasa_HD_OceansofClimateChange.torrent

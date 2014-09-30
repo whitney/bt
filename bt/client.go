@@ -1,6 +1,8 @@
 package bt
 
 import (
+    //"bytes"
+    //"encoding/binary"
     "crypto/sha1"
     "fmt"
     "io"
@@ -157,6 +159,23 @@ func (c *client) TrackerRequest() string {
         if !isBinaryPeers {
             log.Fatal("invalid peers field")
         }
+        for i := 0; i < len(binPeers); i++ {
+            fmt.Printf("%x ", binPeers[i])
+        }
+        l := binPeers[0:4]
+        fmt.Printf("sl1: %x\n", l)
+
+        fmt.Print([]byte(binPeers[0:4]))
+        fmt.Print([]byte(binPeers[4:6]))
+        /*
+        var ip int
+        buf := bytes.NewReader([]byte(binPeers[0:4]))
+        err := binary.Read(buf, binary.BigEndian, &ip)
+        if err != nil {
+            fmt.Println("binary.Read failed:", err)
+        }
+        fmt.Print(ip)
+        */
     } 
 
     fmt.Println("dictPeers:", dictPeers)
