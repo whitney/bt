@@ -142,6 +142,19 @@ func handleConn(conn net.Conn) {
     conn.Write([]byte("Message received."))
 }
 
+func sendToPeer() {
+    fmt.Println("start client");
+    conn, err := net.Dial("tcp", "localhost:8080")
+    if err != nil {
+        log.Fatal("Connection error", err)
+    }
+    encoder := gob.NewEncoder(conn)
+    p := &P{1, 2}
+    encoder.Encode(p)
+    conn.Close()
+    fmt.Println("done");
+}
+
 type trackerResponse struct {
     FailureReason string
     Interval int64
