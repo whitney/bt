@@ -16,6 +16,7 @@ import (
 
 const (
     peerId = "-WZ0001-373bff40fe0e"
+    host = "localhost"
     port   = "6881"
 )
 
@@ -26,6 +27,7 @@ type client struct {
     totalBytes int64
     uploadedBytes int64
     downloadedBytes int64
+    server net.Listener
 }
 
 func New(torrent io.Reader) *client {
@@ -94,13 +96,21 @@ func (c *client) trackerURL() string {
 
 func (c *client) Start() {
 
+    // start server
     c.startServer()
+
+    // connect to peers
+
+    // do handshakes
+
+    // run until:
+    // c.downloadedBytes == c.totalBytes
 
     fmt.Println(c.trackerRequest()) 
 }
 
 func (c *client) startServer() {
-    ln, err := net.Listen("tcp", ":8080")
+    ln, err := net.Listen("tcp", host + ":" + port)
     if err != nil {
         // handle error
     }
@@ -115,6 +125,10 @@ func (c *client) startServer() {
         }
         go handleConn(conn)
     }
+}
+
+func (c *client) stopServer() {
+    c.server.Close()
 }
 
 type P struct {
