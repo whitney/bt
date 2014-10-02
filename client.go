@@ -1,4 +1,4 @@
-package bt
+package main
 
 import (
     "crypto/sha1"
@@ -21,21 +21,23 @@ const (
 )
 
 type client struct {
-    torrent io.Reader
-    announce string
-    infoHash map[string]interface{}
-    totalBytes int64
-    uploadedBytes int64
+    torrent         io.Reader
+    announce        string
+    infoHash        map[string]interface{}
+    totalBytes      int64
+    uploadedBytes   int64
     downloadedBytes int64
-    server net.Listener
+    server          net.Listener
+    peers           []*peer
+    tracker         *tracker
 }
 
 type peer struct {
-    id string
+    id   string
     host string
 }
 
-func New(torrent io.Reader) *client {
+func NewClient(torrent io.Reader) *client {
     c := new(client)
     c.torrent = torrent
 
@@ -101,10 +103,14 @@ func (c *client) trackerURL() string {
 
 func (c *client) Start() {
 
-    // start server
-    c.startServer()
+    // fetch tracker / peers
+    c.initTracker()
 
-    // connect to peers
+    // start server in goroutine
+    go c.startServer()
+
+    // connect to peers in goroutines
+
 
     // do handshakes
 
@@ -166,16 +172,21 @@ func (p *peer) doHandshake(infoHash string, peerId string) {
     fmt.Println("done");
 }
 
-type trackerResponse struct {
+func (c *client) initTracker() {
+    c.tracker = c.trackerRequest()
+}
+
+type tracker struct {
     FailureReason string
     Interval int64
     MinInterval int64
     Complete int64
     Incomplete int64
     Peers []string
+    peers           []*peer
 }
 
-func (c *client) trackerRequest() *trackerResponse {
+func (c *client) trackerRequest() *tracker {
     resp, err := http.Get(c.trackerURL())
     if err != nil {
         log.Fatal(err)
@@ -190,7 +201,7 @@ func (c *client) trackerRequest() *trackerResponse {
         log.Fatal(err)
     }
 
-    tr := new(trackerResponse)
+    tr := new(tracker)
 
     failureReason := dict["failure reason"]
     if failureReason != nil {

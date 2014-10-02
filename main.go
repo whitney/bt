@@ -3,8 +3,6 @@ package main
 import (
     "log"
     "os"
-
-    "github.com/whitney/bt/bt"
 )
 
 func main() {
@@ -14,7 +12,7 @@ func main() {
     }
     defer file.Close()
 
-    c := bt.New(file)
+    c := NewClient(file)
 
     c.Start()
 }
