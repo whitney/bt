@@ -30,6 +30,11 @@ type client struct {
     server net.Listener
 }
 
+type peer struct {
+    id string
+    host string
+}
+
 func New(torrent io.Reader) *client {
     c := new(client)
     c.torrent = torrent
@@ -142,15 +147,21 @@ func handleConn(conn net.Conn) {
     conn.Write([]byte("Message received."))
 }
 
-func sendToPeer() {
+// handshake: <pstrlen><pstr><reserved><info_hash><peer_id>
+// In version 1.0 of the BitTorrent protocol, pstrlen = 19, 
+// and pstr = "BitTorrent protocol".
+func (p *peer) doHandshake(infoHash string, peerId string) {
     fmt.Println("start client");
-    conn, err := net.Dial("tcp", "localhost:8080")
+    conn, err := net.Dial("tcp", p.host)
     if err != nil {
         log.Fatal("Connection error", err)
     }
     encoder := gob.NewEncoder(conn)
-    p := &P{1, 2}
-    encoder.Encode(p)
+
+    msg := "19BitTorrent protocol" + infoHash + peerId
+
+    encoder.Encode(msg)
+    handleConn(conn)
     conn.Close()
     fmt.Println("done");
 }
