@@ -14,5 +14,7 @@ func main() {
 
     c := NewClient(file)
 
-    c.Start()
+    //c.Start()
+
+    c.StartServer()
 }

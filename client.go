@@ -111,7 +111,7 @@ func (c *client) Start() {
     c.initTracker()
 
     // start server in goroutine
-    go c.startServer()
+    go c.StartServer()
 
     // connect to peers 
     // and do handshakes 
@@ -127,7 +127,7 @@ func (c *client) Start() {
     fmt.Println(c.trackerRequest()) 
 }
 
-func (c *client) startServer() {
+func (c *client) StartServer() {
     ln, err := net.Listen("tcp", host + ":" + port)
     if err != nil {
         log.Fatal(err)
@@ -138,7 +138,7 @@ func (c *client) startServer() {
     defer ln.Close()
 
     for {
-        conn, err := ln.Accept()
+        conn, err := ln.Accept() // this blocks until connection or error
         if err != nil {
             // handle error
             log.Println(err)
@@ -157,9 +157,10 @@ type P struct {
 }
 func handleConn(conn net.Conn) {
     dec := gob.NewDecoder(conn)
-    p := &P{}
-    dec.Decode(p)
-    fmt.Printf("Received : %+v", p);
+    var p string
+    dec.Decode(&p)
+    //fmt.Printf("server received : %+v", p);
+    fmt.Printf("server received : %s\n", p);
     conn.Write([]byte("Message received."))
 }
 
