@@ -28,7 +28,6 @@ type client struct {
     uploadedBytes   int64
     downloadedBytes int64
     server          net.Listener
-    peers           []*peer
     tracker         *tracker
 }
 
@@ -101,6 +100,11 @@ func (c *client) trackerURL() string {
     return c.announce + "?" + params.Encode()
 }
 
+func (c *client) peers() []*peer {
+    tracker := *c.tracker
+    return tracker.Peers
+}
+
 func (c *client) Start() {
 
     // fetch tracker / peers
@@ -109,10 +113,13 @@ func (c *client) Start() {
     // start server in goroutine
     go c.startServer()
 
-    // connect to peers in goroutines
-
-
-    // do handshakes
+    // connect to peers 
+    // and do handshakes 
+    // in goroutines
+    peers := c.peers()
+    for i := 0; i < len(peers); i++ {
+        go peers[i].doHandshake(string(bencode.Encode(c.infoHash)))
+    }
 
     // run until:
     // c.downloadedBytes == c.totalBytes
@@ -123,8 +130,10 @@ func (c *client) Start() {
 func (c *client) startServer() {
     ln, err := net.Listen("tcp", host + ":" + port)
     if err != nil {
-        // handle error
+        log.Fatal(err)
     }
+
+    log.Println("bt server listening on port " + port)
 
     defer ln.Close()
 
@@ -132,6 +141,7 @@ func (c *client) startServer() {
         conn, err := ln.Accept()
         if err != nil {
             // handle error
+            log.Println(err)
             continue
         }
         go handleConn(conn)
@@ -156,8 +166,8 @@ func handleConn(conn net.Conn) {
 // handshake: <pstrlen><pstr><reserved><info_hash><peer_id>
 // In version 1.0 of the BitTorrent protocol, pstrlen = 19, 
 // and pstr = "BitTorrent protocol".
-func (p *peer) doHandshake(infoHash string, peerId string) {
-    fmt.Println("start client");
+func (p *peer) doHandshake(infoHash string) {
+    fmt.Println("initiating peer handshake with " + p.host);
     conn, err := net.Dial("tcp", p.host)
     if err != nil {
         log.Fatal("Connection error", err)
@@ -167,7 +177,9 @@ func (p *peer) doHandshake(infoHash string, peerId string) {
     msg := "19BitTorrent protocol" + infoHash + peerId
 
     encoder.Encode(msg)
+
     handleConn(conn)
+
     conn.Close()
     fmt.Println("done");
 }
@@ -178,12 +190,11 @@ func (c *client) initTracker() {
 
 type tracker struct {
     FailureReason string
-    Interval int64
-    MinInterval int64
-    Complete int64
-    Incomplete int64
-    Peers []string
-    peers           []*peer
+    Interval      int64
+    MinInterval   int64
+    Complete      int64
+    Incomplete    int64
+    Peers         []*peer
 }
 
 func (c *client) trackerRequest() *tracker {
@@ -230,7 +241,7 @@ func (c *client) trackerRequest() *tracker {
 
     var binPeers string
     var isBinaryPeers bool
-    var peers []string
+    var peers []*peer
 
     // determine if peers field is disctionary model or binary model
     dictPeers, isDictPeers := dict["peers"].(map[string]interface{})
@@ -259,9 +270,9 @@ func (c *client) trackerRequest() *tracker {
 }
 
 // returns <ip address>:<port>
-func ParsePeer(peer []byte) string {
+func ParsePeer(peerHost []byte) *peer {
     peerIp := ""
-    ipBytes := peer[0:4]
+    ipBytes := peerHost[0:4]
 
     for i := 0; i < len(ipBytes); i++ {
         ipComponent := int64(ipBytes[i])
@@ -272,8 +283,8 @@ func ParsePeer(peer []byte) string {
         }
     }
 
-    portBytes := peer[4:6]
+    portBytes := peerHost[4:6]
     port := strconv.FormatInt(256 * int64(portBytes[0]) + int64(portBytes[1]), 10)
 
-    return peerIp + ":" + port
+    return &peer{host: peerIp + ":" + port}
 }
